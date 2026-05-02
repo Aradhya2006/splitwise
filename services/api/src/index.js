@@ -18,6 +18,8 @@ app.use(morgan('dev'));
 app.use(express.json());
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
+const billRoutes = require('./routes/bills');
+app.use('/api/bills', billRoutes);
 
 app.get('/', (req, res) => {
   res.json({ status: 'Split.ai API running', version: '1.0.0' });
