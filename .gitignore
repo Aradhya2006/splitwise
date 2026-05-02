@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables
+.env
+**/.env
+
+# Expo
+apps/mobile/.expo/
+apps/mobile/dist/
+
+# Python
+services/ai/__pycache__/
+services/ai/venv/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
