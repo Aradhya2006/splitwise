@@ -22,6 +22,8 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const billRoutes = require('./routes/bills');
 const splitRoutes = require('./routes/splits');
+const paymentRoutes = require('./routes/payments');
+app.use('/api/payments', paymentRoutes);
 app.use('/api/splits', splitRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/bills', billRoutes);
