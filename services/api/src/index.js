@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+
 require('./config/db');
 require('./config/redis');
 
@@ -16,21 +17,23 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Routes
 const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
 const billRoutes = require('./routes/bills');
+const splitRoutes = require('./routes/splits');
+app.use('/api/splits', splitRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/bills', billRoutes);
 
+// Health check
 app.get('/', (req, res) => {
   res.json({ status: 'Split.ai API running', version: '1.0.0' });
 });
 
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-});
+// Socket.io live sessions
+const sessionHandler = require('./socket/sessionHandler');
+sessionHandler(io);
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
