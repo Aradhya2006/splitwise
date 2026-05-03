@@ -58,12 +58,14 @@ def parse_bill_text(text):
     total = 0.0
 
     # Patterns
-    price_pattern = re.compile(r'(\d+(?:\.\d{1,2})?)')
+    # Matches numbers with exactly two decimals, optionally with thousand separators: 12.50, 1,234.50, 12,50
+    price_pattern = re.compile(r'(\d+(?:[.,]\d{3})*[.,]\d{2})')
     tax_keywords = ['cgst', 'sgst', 'gst', 'tax', 'vat']
     service_keywords = ['service charge', 'service', 'srv chg']
     skip_keywords = ['subtotal', 'sub total', 'total', 'bill', 
                      'thank', 'welcome', 'table', 'date', 
-                     'time', 'invoice', 'receipt', 'order']
+                     'time', 'invoice', 'receipt', 'order',
+                     'cash', 'visa', 'mastercard', 'card', 'change', 'due', 'paid']
     discount_keywords = ['discount', 'offer', 'off', 'savings']
 
     discount = 0.0
@@ -77,7 +79,21 @@ def parse_bill_text(text):
         if not prices:
             continue
 
-        price = float(prices[-1])
+        # Get the last matching price pattern in the line
+        price_str = prices[-1]
+        
+        # Normalize the string to be parsed as float
+        # If the separator before the last two digits is a comma, convert it to a dot
+        if len(price_str) >= 3 and price_str[-3] == ',':
+            price_str = price_str[:-3] + '.' + price_str[-2:]
+            
+        # Remove any remaining commas (which are thousand separators)
+        price_str = price_str.replace(',', '')
+
+        try:
+            price = float(price_str)
+        except ValueError:
+            continue
 
         # Check tax lines
         if any(kw in line_lower for kw in tax_keywords):
@@ -115,11 +131,12 @@ def parse_bill_text(text):
             continue
 
         # Everything else is a bill item
-        # Extract item name — everything before the last number
-        name = re.sub(r'\s*\d+(?:\.\d{1,2})?\s*$', '', line).strip()
-        name = re.sub(r'^\d+\s*', '', name).strip()  # remove leading numbers
+        # Extract item name — remove the price and trailing whitespace
+        name = re.sub(r'\s*\d+(?:[.,]\d{3})*[.,]\d{2}\s*$', '', line).strip()
+        name = re.sub(r'^\d+[\sx*]+', '', name).strip()  # remove leading numbers/quantities like "1 x "
 
-        if name and price > 0 and price < 10000:
+        # Basic validation to ensure we're not adding noise
+        if len(name) > 2 and price > 0 and price < 10000:
             items.append({
                 "name": name if name else "Item",
                 "price": price,

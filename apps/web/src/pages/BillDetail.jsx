@@ -138,27 +138,26 @@ export default function BillDetail() {
   };
 
   const saveSplits = async () => {
-    try {
-      const splits = items.map(item => ({
-        itemId: item.id,
-        assignments: (assignments[item.id] || []).map(a => ({
-          userId: a.memberId,
-          percentage: a.percentage
-        }))
-      })).filter(s => s.assignments.length > 0);
+  try {
+    const splits = items.map(item => ({
+      itemId: item.id,
+      assignments: (assignments[item.id] || []).map(a => ({
+        userId: a.memberId,
+        percentage: a.percentage
+      }))
+    })).filter(s => s.assignments.length > 0);
 
-      await api.post(`/api/splits/${billId}/calculate`, {
-        splits,
-        tax: { cgst: parseFloat(bill.cgst), sgst: parseFloat(bill.sgst), serviceCharge: parseFloat(bill.service_charge) },
-        discount: { type: bill.discount_type || 'none', amount: parseFloat(bill.discount_amount) }
-      });
+    await api.post(`/api/splits/${billId}/calculate`, {
+      splits,
+      tax: { cgst: parseFloat(bill.cgst), sgst: parseFloat(bill.sgst), serviceCharge: parseFloat(bill.service_charge) },
+      discount: { type: bill.discount_type || 'none', amount: parseFloat(bill.discount_amount) }
+    });
 
-      alert('Splits saved! Proceeding to payment.');
-      fetchBill();
-    } catch (err) {
-      alert('Failed to save splits');
-    }
-  };
+    navigate(`/payment/${billId}`);
+  } catch (err) {
+    alert('Failed to save splits');
+  }
+};
 
   if (!bill) return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
