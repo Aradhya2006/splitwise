@@ -130,6 +130,7 @@ const getBill = async (req, res) => {
   }
 };
 
+
 // Add member to bill by phone
 const addMember = async (req, res) => {
   const { billId } = req.params;
@@ -168,4 +169,46 @@ const addMember = async (req, res) => {
   }
 };
 
-module.exports = { createBill, addItem, getBill, addMember };
+
+
+// Get all bills for current user
+const getUserBills = async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const result = await pool.query(
+      `SELECT b.* FROM bills b
+       JOIN bill_members bm ON b.id = bm.bill_id
+       WHERE bm.user_id = $1
+       ORDER BY b.created_at DESC`,
+      [userId]
+    );
+    res.json({ bills: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
+const deleteItem = async (req, res) => {
+  const { itemId, billId } = req.params;
+  try {
+    await pool.query('DELETE FROM items WHERE id = $1', [itemId]);
+
+    // Recalculate subtotal and total
+    await pool.query(
+      `UPDATE bills SET 
+        subtotal = COALESCE((SELECT SUM(price * quantity) FROM items WHERE bill_id = $1), 0),
+        total = COALESCE((SELECT SUM(price * quantity) FROM items WHERE bill_id = $1), 0) + cgst + sgst + service_charge
+       WHERE id = $1`,
+      [billId]
+    );
+
+    res.json({ message: 'Item deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { createBill, addItem, getBill, addMember, getUserBills, deleteItem };
