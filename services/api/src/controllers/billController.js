@@ -20,10 +20,10 @@ const createBill = async (req, res) => {
 
     // Add creator as first member
     await pool.query(
-      `INSERT INTO bill_members (bill_id, user_id) 
-       VALUES ($1, $2)`,
-      [bill.id, userId]
-    );
+  `INSERT INTO bill_members (bill_id, user_id, status, amount_paid) 
+   VALUES ($1, $2, 'paid', 0)`,
+  [bill.id, userId]
+);
 
     // Generate room code for live session
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();

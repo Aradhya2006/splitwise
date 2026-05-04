@@ -17,12 +17,7 @@ export default function NewBillScreen({ navigation }) {
     setLoading(true);
     try {
       const res = await api.post('/api/bills', { title });
-      const { bill, room_code } = res.data;
-      Alert.alert(
-        'Bill Created!',
-        `Room code: ${room_code}\nShare this with friends to join`,
-        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
-      );
+      navigation.navigate('BillDetail', { billId: res.data.bill.id });
     } catch (err) {
       Alert.alert('Error', 'Failed to create bill');
     } finally {

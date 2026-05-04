@@ -59,16 +59,24 @@ export default function BillDetail() {
     } catch (err) { alert(err.response?.data?.error || 'Failed to add member'); }
   };
 
-  const shareRoomCode = () => {
-    const text = `Join my Split.ai bill "${bill?.title}"!\nRoom code: ${roomCode}`;
-    if (navigator.share) {
-      navigator.share({ title: 'Split.ai', text });
-    } else {
-      navigator.clipboard.writeText(text);
-      alert('Room code copied!');
-    }
-  };
+const shareRoomCode = () => {
+  const text = `Join my Split.ai bill "${bill?.title}"!\nRoom code: ${roomCode}`;
+  if (navigator.share) {
+    navigator.share({ title: 'Split.ai', text });
+  } else {
+    navigator.clipboard.writeText(text);
+    alert('Room code copied!');
+  }
+};
 
+const settleBill = async () => {
+  try {
+    await api.post(`/api/payments/${billId}/generate`);
+    navigate(`/payment/${billId}`);
+  } catch (err) {
+    alert(err.response?.data?.error || 'Please add your UPI ID first');
+  }
+};
   const scanBill = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -176,10 +184,18 @@ export default function BillDetail() {
 
       {/* Room Code */}
       <div style={styles.roomCard}>
-        <p style={styles.roomLabel}>Room Code</p>
-        <p style={styles.roomCode}>{roomCode}</p>
-        <button style={styles.shareBtn} onClick={shareRoomCode}>Share with friends →</button>
-      </div>
+  <p style={styles.roomLabel}>Room Code</p>
+  <p style={styles.roomCode}>{roomCode}</p>
+  <button style={styles.shareBtn} onClick={shareRoomCode}>Share with friends →</button>
+  {bill.status !== 'settled' && (
+    <button style={styles.settleBtn} onClick={settleBill}>
+      Generate Payment Links →
+    </button>
+  )}
+  {bill.status === 'settled' && (
+    <div style={styles.settledBadge}>✓ Bill Settled</div>
+  )}
+</div>
 
       {/* Scan Bill */}
       <div style={styles.card}>
@@ -354,5 +370,15 @@ const styles = {
   statusBadge: { padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: '500' },
   saveBtn: { background: '#4ec9b0', color: '#000', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: 16 },
   uploadBtn: { background: '#1a2a3a', border: '1px dashed #4ec9b0', borderRadius: 10, padding: 16, color: '#4ec9b0', cursor: 'pointer', textAlign: 'center', display: 'block', fontSize: 15, fontWeight: '500' },
-  uploadHint: { color: '#555', fontSize: 12, marginTop: 8, textAlign: 'center' }
+  uploadHint: { color: '#555', fontSize: 12, marginTop: 8, textAlign: 'center' },
+  settleBtn: {
+  background: '#4ec9b0', color: '#000', border: 'none',
+  borderRadius: 8, padding: '10px 20px', cursor: 'pointer',
+  fontWeight: 'bold', marginTop: 8
+},
+settledBadge: {
+  background: '#1a3a2a', color: '#4ec9b0', padding: '8px 16px',
+  borderRadius: 8, fontWeight: 'bold', marginTop: 8,
+  display: 'inline-block'
+}
 };
