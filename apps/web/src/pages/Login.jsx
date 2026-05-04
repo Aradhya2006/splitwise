@@ -39,93 +39,99 @@ export default function Login() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.logo}>Split.ai</h1>
-        <p style={styles.tagline}>Split bills. Not friendships.</p>
+    <>
+      <div className="bg-glow"></div>
+      <div className="bg-glow-2"></div>
+      <div style={styles.container}>
+        <div className="glass-panel animate-slide-up" style={styles.card}>
+          <h1 style={styles.logo}>Split.ai</h1>
+          <p style={styles.tagline}>Split bills, not friendships.</p>
 
-        {error && <div style={styles.error}>{error}</div>}
+          {error && <div style={styles.error}>{error}</div>}
 
-        {step === 'phone' ? (
-          <>
-            <input
-              style={styles.input}
-              placeholder="Your name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
-            <div style={styles.phoneRow}>
-              <span style={styles.code}>+91</span>
+          {step === 'phone' ? (
+            <div className="animate-slide-up animate-delay-1" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <input
-                style={{...styles.input, flex: 1}}
-                placeholder="10-digit phone number"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                maxLength={10}
+                style={styles.input}
+                placeholder="Your name"
+                value={name}
+                onChange={e => setName(e.target.value)}
               />
+              <div style={styles.phoneRow}>
+                <span style={styles.code}>+91</span>
+                <input
+                  style={{...styles.input, flex: 1}}
+                  placeholder="10-digit phone number"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  maxLength={10}
+                />
+              </div>
+              <button style={styles.btn} onClick={sendOTP} disabled={loading}>
+                {loading ? 'Sending...' : 'Send OTP'}
+              </button>
             </div>
-            <button style={styles.btn} onClick={sendOTP} disabled={loading}>
-              {loading ? 'Sending...' : 'Send OTP →'}
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={styles.hint}>Enter OTP for +91 {phone}</p>
-            <input
-              style={{...styles.input, textAlign: 'center', fontSize: 24, letterSpacing: 8}}
-              placeholder="123456"
-              value={otp}
-              onChange={e => setOtp(e.target.value)}
-              maxLength={6}
-            />
-            <p style={styles.hint}>Use 123456 for testing</p>
-            <button style={styles.btn} onClick={verifyOTP} disabled={loading}>
-              {loading ? 'Verifying...' : 'Verify & Login →'}
-            </button>
-            <button style={styles.backBtn} onClick={() => setStep('phone')}>
-              ← Change number
-            </button>
-          </>
-        )}
+          ) : (
+            <div className="animate-slide-up animate-delay-1" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={styles.hint}>Enter OTP for +91 {phone}</p>
+              <input
+                style={{...styles.input, textAlign: 'center', fontSize: 24, letterSpacing: 8}}
+                placeholder="123456"
+                value={otp}
+                onChange={e => setOtp(e.target.value)}
+                maxLength={6}
+              />
+              <p style={styles.hint}>Use 123456 for testing</p>
+              <button style={styles.btn} onClick={verifyOTP} disabled={loading}>
+                {loading ? 'Verifying...' : 'Verify and Login'}
+              </button>
+              <button style={styles.backBtn} onClick={() => setStep('phone')}>
+                Change number
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 const styles = {
   container: {
-    minHeight: '100vh', background: '#0a0a0a',
-    display: 'flex', alignItems: 'center', justifyContent: 'center'
+    minHeight: '100vh',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 24
   },
   card: {
-    background: '#1a1a1a', borderRadius: 16, padding: 40,
-    width: '100%', maxWidth: 400, display: 'flex',
-    flexDirection: 'column', gap: 12
+    padding: '48px 40px',
+    width: '100%', maxWidth: 440, display: 'flex',
+    flexDirection: 'column', gap: 16
   },
-  logo: { color: '#4ec9b0', fontSize: 42, fontWeight: 'bold', textAlign: 'center', margin: 0 },
-  tagline: { color: '#666', textAlign: 'center', marginBottom: 16 },
+  logo: { fontSize: 56, fontWeight: '800', textAlign: 'center', margin: 0, color: 'var(--primary)', letterSpacing: '-2px' },
+  tagline: { color: 'var(--text-muted)', textAlign: 'center', marginBottom: 24, fontSize: 16, fontWeight: '500' },
   input: {
-    background: '#2a2a2a', border: '1px solid #333', borderRadius: 10,
-    padding: 14, color: '#fff', fontSize: 16, width: '100%',
-    boxSizing: 'border-box', outline: 'none'
+    background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 14,
+    padding: 16, color: 'var(--text-main)', fontSize: 16, width: '100%',
+    boxSizing: 'border-box', outline: 'none', transition: 'all 0.2s'
   },
-  phoneRow: { display: 'flex', gap: 10, alignItems: 'center' },
+  phoneRow: { display: 'flex', gap: 12, alignItems: 'center' },
   code: {
-    background: '#2a2a2a', border: '1px solid #333', borderRadius: 10,
-    padding: 14, color: '#fff', fontSize: 16
+    background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 14,
+    padding: 16, color: 'var(--text-main)', fontSize: 16, fontWeight: '600'
   },
   btn: {
-    background: '#4ec9b0', color: '#000', border: 'none',
-    borderRadius: 10, padding: 16, fontSize: 16,
-    fontWeight: 'bold', cursor: 'pointer', width: '100%'
+    background: 'var(--primary)', color: '#fff', border: 'none',
+    borderRadius: 14, padding: 18, fontSize: 16,
+    fontWeight: '800', cursor: 'pointer', width: '100%',
+    boxShadow: '0 10px 20px rgba(99, 102, 241, 0.2)'
   },
   backBtn: {
-    background: 'transparent', color: '#4ec9b0', border: 'none',
-    cursor: 'pointer', fontSize: 14
+    background: 'transparent', color: 'var(--primary)', border: 'none',
+    cursor: 'pointer', fontSize: 14, fontWeight: '700'
   },
   error: {
-    background: '#2a1a1a', color: '#f44747', padding: 10,
-    borderRadius: 8, fontSize: 13
+    background: 'rgba(239, 68, 68, 0.05)', color: 'var(--danger)', padding: 12,
+    borderRadius: 10, fontSize: 14, border: '1px solid rgba(239, 68, 68, 0.1)', textAlign: 'center'
   },
-  hint: { color: '#666', fontSize: 13, textAlign: 'center' }
+  hint: { color: 'var(--text-muted)', fontSize: 14, textAlign: 'center', fontWeight: '500' }
 };

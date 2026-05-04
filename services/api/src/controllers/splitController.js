@@ -28,25 +28,41 @@ const calculateSplits = async (req, res) => {
     const items = itemsResult.rows;
 
     // Step 1 — Save item splits
+    // Clear old splits to prevent duplicates when saving multiple times
+    await pool.query(
+      `DELETE FROM item_splits WHERE item_id IN (SELECT id FROM items WHERE bill_id = $1)`,
+      [billId]
+    );
+
     for (const split of splits) {
       const item = items.find(i => i.id === split.itemId);
       if (!item) continue;
 
-      const totalPct = split.assignments.reduce((sum, a) => sum + a.percentage, 0);
+      // Aggregate assignments by userId to prevent duplicates
+      const userAssignments = {};
+      let totalPct = 0;
+      
+      for (const a of split.assignments) {
+        if (!userAssignments[a.userId]) {
+          userAssignments[a.userId] = 0;
+        }
+        userAssignments[a.userId] += a.percentage;
+        totalPct += a.percentage;
+      }
+
       if (Math.abs(totalPct - 100) > 0.01) {
         return res.status(400).json({
           error: `Percentages for item ${item.name} must add up to 100`
         });
       }
 
-      for (const assignment of split.assignments) {
-        const amount = (item.price * item.quantity * assignment.percentage) / 100;
+      for (const [userId, percentage] of Object.entries(userAssignments)) {
+        const amount = (item.price * item.quantity * percentage) / 100;
 
         await pool.query(
           `INSERT INTO item_splits (item_id, user_id, percentage, amount)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT DO NOTHING`,
-          [split.itemId, assignment.userId, assignment.percentage, amount]
+           VALUES ($1, $2, $3, $4)`,
+          [split.itemId, userId, percentage, amount]
         );
       }
     }
@@ -124,6 +140,12 @@ const calculateSplits = async (req, res) => {
       );
     }
 
+    // Update bill status to pending
+    await pool.query(
+      `UPDATE bills SET status = 'pending' WHERE id = $1 AND status = 'draft'`,
+      [billId]
+    );
+
     // Update discount on bill
     if (discount?.amount) {
       await pool.query(
@@ -173,5 +195,20 @@ const getSplitSummary = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+const getItemSplits = async (req, res) => {
+  const { billId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT its.* FROM item_splits its
+       JOIN items i ON its.item_id = i.id
+       WHERE i.bill_id = $1`,
+      [billId]
+    );
+    res.json({ splits: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
 
-module.exports = { calculateSplits, getSplitSummary };
+module.exports = { calculateSplits, getSplitSummary, getItemSplits };

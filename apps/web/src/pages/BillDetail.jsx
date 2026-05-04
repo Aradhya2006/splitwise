@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -18,17 +18,38 @@ export default function BillDetail() {
   const [assignments, setAssignments] = useState({});
   const [selectedItem, setSelectedItem] = useState(null);
 
-  useEffect(() => { fetchBill(); }, []);
-
-  const fetchBill = async () => {
+  const fetchBill = useCallback(async () => {
     try {
       const res = await api.get(`/api/bills/${billId}`);
       setBill(res.data.bill);
       setItems(res.data.items);
       setMembers(res.data.members);
       setRoomCode(res.data.room_code);
+
+      // Load existing splits
+      const splitsRes = await api.get(`/api/splits/${billId}/items`);
+      if (splitsRes.data.splits) {
+        const loadedAssignments = {};
+        splitsRes.data.splits.forEach(split => {
+          if (!loadedAssignments[split.item_id]) {
+            loadedAssignments[split.item_id] = [];
+          }
+          const existing = loadedAssignments[split.item_id].find(a => a.memberId === split.user_id);
+          if (existing) {
+            existing.percentage += parseFloat(split.percentage);
+          } else {
+            loadedAssignments[split.item_id].push({
+              memberId: split.user_id,
+              percentage: parseFloat(split.percentage)
+            });
+          }
+        });
+        setAssignments(loadedAssignments);
+      }
     } catch (err) { console.error(err); }
-  };
+  }, [billId]);
+
+  useEffect(() => { fetchBill(); }, [fetchBill]);
 
   const addItem = async () => {
     if (!itemName || !itemPrice) return;
@@ -60,12 +81,52 @@ export default function BillDetail() {
   };
 
 const shareRoomCode = () => {
-  const text = `Join my Split.ai bill "${bill?.title}"!\nRoom code: ${roomCode}`;
+  const joinLink = `${window.location.origin}/join/${roomCode}`;
+  const text = `Join my Split.ai bill "${bill?.title}"!\nRoom code: ${roomCode}\nLink: ${joinLink}`;
   if (navigator.share) {
-    navigator.share({ title: 'Split.ai', text });
+    navigator.share({ title: 'Split.ai', text, url: joinLink });
   } else {
     navigator.clipboard.writeText(text);
-    alert('Room code copied!');
+    alert('Room code & link copied to clipboard!');
+  }
+};
+
+const addFromContacts = async () => {
+  if (!('contacts' in navigator && 'ContactsManager' in window)) {
+    alert('Contact selection is not supported on this browser. Try on mobile Chrome.');
+    return;
+  }
+  try {
+    const props = ['name', 'tel'];
+    const contacts = await navigator.contacts.select(props, { multiple: true });
+    let addedCount = 0;
+    
+    setLoading(true);
+    for (const contact of contacts) {
+      if (contact.tel && contact.tel.length > 0) {
+        let rawPhone = contact.tel[0].replace(/\D/g, '');
+        if (rawPhone.length >= 10) {
+          const phone = rawPhone.slice(-10);
+          try {
+            await api.post(`/api/bills/${billId}/members`, { phone });
+            addedCount++;
+          } catch (err) {
+            console.warn('Failed to add phone', phone, err);
+          }
+        }
+      }
+    }
+    setLoading(false);
+    
+    if (addedCount > 0) {
+      fetchBill();
+      alert(`Successfully added ${addedCount} contact(s)!`);
+    } else {
+      alert('No valid contacts were selected or they need to sign up first.');
+    }
+  } catch (ex) {
+    console.error(ex);
+    setLoading(false);
   }
 };
 
@@ -74,7 +135,20 @@ const settleBill = async () => {
     await api.post(`/api/payments/${billId}/generate`);
     navigate(`/payment/${billId}`);
   } catch (err) {
-    alert(err.response?.data?.error || 'Please add your UPI ID first');
+    if (err.response?.status === 400 && err.response.data.error.includes('UPI ID')) {
+      const upi = window.prompt("Please enter your UPI ID to receive payments (e.g., yourname@okaxis):");
+      if (upi && upi.trim()) {
+        try {
+           await api.post('/api/payments/upi-id', { upiId: upi.trim() });
+           await api.post(`/api/payments/${billId}/generate`);
+           navigate(`/payment/${billId}`);
+        } catch(e) {
+           alert(e.response?.data?.error || "Failed to save UPI ID or generate payments.");
+        }
+      }
+    } else {
+      alert(err.response?.data?.error || 'Please add your UPI ID first');
+    }
   }
 };
   const scanBill = async (e) => {
@@ -145,6 +219,17 @@ const settleBill = async () => {
     return total.toFixed(2);
   };
 
+  const deleteBill = async () => {
+    if (window.confirm('Are you sure you want to delete this bill? This cannot be undone.')) {
+      try {
+        await api.delete(`/api/bills/${billId}`);
+        navigate('/home');
+      } catch (err) {
+        alert(err.response?.data?.error || 'Failed to delete bill');
+      }
+    }
+  };
+
   const saveSplits = async () => {
   try {
     const splits = items.map(item => ({
@@ -162,7 +247,7 @@ const settleBill = async () => {
     });
 
     navigate(`/payment/${billId}`);
-  } catch (err) {
+  } catch {
     alert('Failed to save splits');
   }
 };
@@ -174,41 +259,49 @@ const settleBill = async () => {
   );
 
   return (
-    <div style={styles.container}>
-      <button style={styles.back} onClick={() => navigate('/home')}>← Back</button>
+    <>
+      <div className="bg-glow"></div>
+      <div className="bg-glow-2"></div>
+      <div style={styles.container} className="animate-slide-up">
+        <button style={styles.back} onClick={() => navigate('/home')}>Back to Dashboard</button>
 
       <div style={styles.billHeader}>
         <h1 style={styles.billTitle}>{bill.title}</h1>
-        <div style={styles.totalBadge}>₹{bill.total}</div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={styles.totalBadge}>₹{bill.total}</div>
+          {user?.id === bill.created_by && (
+            <button style={styles.deleteBillBtn} onClick={deleteBill}>Delete Bill</button>
+          )}
+        </div>
       </div>
 
       {/* Room Code */}
-      <div style={styles.roomCard}>
+      <div className="glass-panel animate-slide-up animate-delay-1" style={styles.roomCard}>
   <p style={styles.roomLabel}>Room Code</p>
   <p style={styles.roomCode}>{roomCode}</p>
-  <button style={styles.shareBtn} onClick={shareRoomCode}>Share with friends →</button>
+  <button style={styles.shareBtn} onClick={shareRoomCode}>Copy Invite Link</button>
   {bill.status !== 'settled' && (
     <button style={styles.settleBtn} onClick={settleBill}>
-      Generate Payment Links →
+      Generate Payment Summary
     </button>
   )}
   {bill.status === 'settled' && (
-    <div style={styles.settledBadge}>✓ Bill Settled</div>
+    <div style={styles.settledBadge}>Bill Settled</div>
   )}
 </div>
 
       {/* Scan Bill */}
-      <div style={styles.card}>
+      <div className="glass-panel animate-slide-up animate-delay-2" style={styles.card}>
         <p style={styles.cardTitle}>Scan Bill Photo</p>
         <label style={styles.uploadBtn}>
-          {scanning ? 'Scanning...' : '📷 Upload Bill Photo'}
+          {scanning ? 'Scanning...' : 'Upload Bill Image'}
           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={scanBill} disabled={scanning} />
         </label>
         <p style={styles.uploadHint}>AI will automatically extract items and prices</p>
       </div>
 
       {/* Add Item */}
-      <div style={styles.card}>
+      <div className="glass-panel animate-slide-up animate-delay-3" style={styles.card}>
         <p style={styles.cardTitle}>Add Item Manually</p>
         <div style={styles.row}>
           <input style={{...styles.input, flex: 2}} placeholder="Item name" value={itemName} onChange={e => setItemName(e.target.value)} />
@@ -219,7 +312,7 @@ const settleBill = async () => {
       </div>
 
       {/* Items with Assignment */}
-      <div style={styles.card}>
+      <div className="glass-panel animate-slide-up animate-delay-3" style={{...styles.card, padding: 0}}>
         <p style={styles.cardTitle}>Items — tap to assign ({items.length})</p>
         <p style={styles.assignHint}>Tap an item then tap who ate it</p>
         {items.length === 0 ? (
@@ -230,8 +323,8 @@ const settleBill = async () => {
               <div
                 style={{
                   ...styles.itemRow,
-                  background: selectedItem === item.id ? '#1a2a3a' : 'transparent',
-                  borderRadius: 8, cursor: 'pointer', padding: '10px 8px'
+                  background: selectedItem === item.id ? 'rgba(99, 102, 241, 0.05)' : 'transparent',
+                  borderRadius: 12, cursor: 'pointer', padding: '12px'
                 }}
                 onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
               >
@@ -246,28 +339,28 @@ const settleBill = async () => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={styles.itemPrice}>₹{item.price}</span>
-                  <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} style={styles.deleteBtn}>✕</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} style={styles.deleteBtn}>Remove</button>
                 </div>
               </div>
 
               {/* Member assignment panel */}
               {selectedItem === item.id && (
                 <div style={styles.assignPanel}>
-                  <p style={styles.assignTitle}>Who ate this?</p>
+                  <p style={styles.assignTitle}>Split</p>
                   <div style={styles.memberChips}>
                     {members.map(member => (
                       <button
                         key={member.id}
                         style={{
                           ...styles.chip,
-                          background: isAssigned(item.id, member.id) ? '#4ec9b0' : '#2a2a2a',
-                          color: isAssigned(item.id, member.id) ? '#000' : '#fff',
+                          background: isAssigned(item.id, member.id) ? 'var(--primary)' : '#fff',
+                          color: isAssigned(item.id, member.id) ? '#fff' : 'var(--text-main)',
                         }}
                         onClick={() => toggleAssignment(item.id, member.id)}
                       >
                         {member.name}
                         {isAssigned(item.id, member.id) && (
-                          <span> ✓ {isAssigned(item.id, member.id).percentage}%</span>
+                          <span> ({isAssigned(item.id, member.id).percentage}%)</span>
                         )}
                       </button>
                     ))}
@@ -287,7 +380,7 @@ const settleBill = async () => {
 
       {/* Split Summary */}
       {members.length > 0 && Object.keys(assignments).length > 0 && (
-        <div style={styles.card}>
+        <div className="glass-panel animate-slide-up animate-delay-3" style={styles.card}>
           <p style={styles.cardTitle}>Split Summary</p>
           {members.map(member => (
             <div key={member.id} style={styles.memberRow}>
@@ -299,14 +392,21 @@ const settleBill = async () => {
             </div>
           ))}
           <button style={styles.saveBtn} onClick={saveSplits}>
-            Save Splits & Proceed to Payment →
+            Review and Confirm
           </button>
         </div>
       )}
 
       {/* Add Member */}
-      <div style={styles.card}>
-        <p style={styles.cardTitle}>Add Member</p>
+      <div className="glass-panel animate-slide-up animate-delay-3" style={styles.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{...styles.cardTitle, marginBottom: 0}}>Add Member</p>
+          {'contacts' in navigator && (
+            <button style={styles.contactBtnSmall} onClick={addFromContacts}>
+              Contacts
+            </button>
+          )}
+        </div>
         <div style={styles.row}>
           <input style={{...styles.input, flex: 1}} placeholder="Phone number" value={memberPhone} onChange={e => setMemberPhone(e.target.value)} type="number" />
           <button style={styles.addBtn} onClick={addMember}>+</button>
@@ -314,7 +414,7 @@ const settleBill = async () => {
       </div>
 
       {/* Members List */}
-      <div style={styles.card}>
+      <div className="glass-panel animate-slide-up animate-delay-3" style={styles.card}>
         <p style={styles.cardTitle}>Members ({members.length})</p>
         {members.map(member => (
           <div key={member.id} style={styles.memberRow}>
@@ -325,60 +425,55 @@ const settleBill = async () => {
             </div>
             <span style={{
               ...styles.statusBadge,
-              background: member.status === 'paid' ? '#1a3a2a' : '#2a1a1a',
-              color: member.status === 'paid' ? '#4ec9b0' : '#f44747'
+              background: member.status === 'paid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              color: member.status === 'paid' ? '#065F46' : '#991B1B'
             }}>{member.status}</span>
           </div>
         ))}
       </div>
     </div>
+    </>
   );
 }
 
 const styles = {
-  container: { minHeight: '100vh', background: '#0a0a0a', padding: 24, maxWidth: 600, margin: '0 auto' },
-  back: { background: 'transparent', color: '#4ec9b0', border: 'none', cursor: 'pointer', fontSize: 16, marginBottom: 24, paddingTop: 24, display: 'block' },
+  container: { minHeight: '100vh', padding: 24, maxWidth: 640, margin: '0 auto' },
+  back: { background: 'transparent', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontSize: 16, marginBottom: 24, paddingTop: 24, display: 'block', fontWeight: '600' },
   billHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  billTitle: { color: '#fff', fontSize: 28, fontWeight: 'bold', margin: 0 },
-  totalBadge: { background: '#1a3a2a', color: '#4ec9b0', padding: '8px 16px', borderRadius: 8, fontWeight: 'bold', fontSize: 18 },
-  roomCard: { background: '#1a1a2a', border: '1px solid #333', borderRadius: 16, padding: 20, marginBottom: 16, textAlign: 'center' },
-  roomLabel: { color: '#666', fontSize: 13, margin: '0 0 8px' },
-  roomCode: { color: '#4ec9b0', fontSize: 36, fontWeight: 'bold', letterSpacing: 8, margin: '0 0 12px' },
-  shareBtn: { background: '#4ec9b0', color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', cursor: 'pointer', fontWeight: 'bold' },
-  card: { background: '#1a1a1a', borderRadius: 16, padding: 20, marginBottom: 16 },
-  cardTitle: { color: '#aaa', fontSize: 13, marginBottom: 12 },
-  assignHint: { color: '#555', fontSize: 12, marginBottom: 12 },
-  row: { display: 'flex', gap: 8, alignItems: 'center' },
-  input: { background: '#2a2a2a', border: '1px solid #333', borderRadius: 10, padding: 12, color: '#fff', fontSize: 15, outline: 'none' },
-  addBtn: { background: '#4ec9b0', color: '#000', border: 'none', borderRadius: 10, padding: '12px 16px', fontSize: 20, fontWeight: 'bold', cursor: 'pointer' },
-  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #222' },
-  subtotalRow: { display: 'flex', justifyContent: 'space-between', padding: '12px 8px 0', marginTop: 4 },
-  itemName: { color: '#fff', fontSize: 15 },
-  itemQty: { color: '#666', fontSize: 13 },
-  itemPrice: { color: '#aaa', fontSize: 15, fontWeight: '500' },
-  assignedBadge: { background: '#1a3a2a', color: '#4ec9b0', fontSize: 11, padding: '2px 6px', borderRadius: 4, marginLeft: 8 },
-  deleteBtn: { background: '#2a1a1a', color: '#f44747', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 12 },
-  assignPanel: { background: '#111', borderRadius: 8, padding: 12, margin: '4px 0 8px' },
-  assignTitle: { color: '#aaa', fontSize: 12, marginBottom: 8 },
+  billTitle: { color: 'var(--text-main)', fontSize: 28, fontWeight: '800', margin: 0, letterSpacing: '-0.5px' },
+  totalBadge: { background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '8px 16px', borderRadius: 12, fontWeight: '800', fontSize: 20, border: '1px solid rgba(99, 102, 241, 0.1)' },
+  deleteBillBtn: { background: 'rgba(239, 68, 68, 0.05)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: '8px 12px', cursor: 'pointer', fontSize: 13, fontWeight: '700' },
+  roomCard: { background: 'var(--surface)', border: '1px solid var(--surface-border)', borderRadius: 24, padding: 32, marginBottom: 24, textAlign: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' },
+  roomLabel: { color: 'var(--text-muted)', fontSize: 14, margin: '0 0 8px', fontWeight: '600' },
+  roomCode: { color: 'var(--primary)', fontSize: 48, fontWeight: '800', letterSpacing: 12, margin: '0 0 24px' },
+  shareBtn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 16, padding: '14px 28px', cursor: 'pointer', fontWeight: '800', fontSize: 16, width: '100%', boxShadow: '0 8px 16px rgba(99, 102, 241, 0.2)' },
+  card: { background: 'var(--surface)', borderRadius: 24, padding: 24, marginBottom: 24, border: '1px solid var(--surface-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' },
+  cardTitle: { color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  assignHint: { color: 'var(--text-muted)', fontSize: 12, marginBottom: 16, fontWeight: '500' },
+  row: { display: 'flex', gap: 12, alignItems: 'center' },
+  input: { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14, color: 'var(--text-main)', fontSize: 15, outline: 'none', transition: 'border-color 0.2s' },
+  addBtn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 20px', fontSize: 20, fontWeight: '800', cursor: 'pointer' },
+  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', transition: 'all 0.2s' },
+  subtotalRow: { display: 'flex', justifyContent: 'space-between', padding: '20px 8px 0', marginTop: 8 },
+  itemName: { color: 'var(--text-main)', fontSize: 16, fontWeight: '700' },
+  itemQty: { color: 'var(--text-muted)', fontSize: 14, fontWeight: '500' },
+  itemPrice: { color: 'var(--text-main)', fontSize: 16, fontWeight: '800' },
+  assignedBadge: { background: 'rgba(99, 102, 241, 0.08)', color: 'var(--primary)', fontSize: 12, padding: '4px 10px', borderRadius: 99, marginLeft: 12, fontWeight: '700' },
+  deleteBtn: { background: 'rgba(239, 68, 68, 0.05)', color: 'var(--danger)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14 },
+  assignPanel: { background: '#F8FAFC', borderRadius: 16, padding: 20, margin: '12px 0' },
+  assignTitle: { color: 'var(--text-muted)', fontSize: 13, marginBottom: 12, fontWeight: '700' },
   memberChips: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  chip: { border: 'none', borderRadius: 20, padding: '8px 16px', cursor: 'pointer', fontSize: 14, fontWeight: '500' },
-  empty: { color: '#555', fontSize: 14 },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #222' },
-  avatar: { width: 36, height: 36, borderRadius: '50%', background: '#4ec9b0', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 16, flexShrink: 0 },
-  memberName: { color: '#fff', fontSize: 15, margin: 0 },
-  memberOwes: { color: '#666', fontSize: 13, margin: '2px 0 0' },
-  statusBadge: { padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: '500' },
-  saveBtn: { background: '#4ec9b0', color: '#000', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: 16 },
-  uploadBtn: { background: '#1a2a3a', border: '1px dashed #4ec9b0', borderRadius: 10, padding: 16, color: '#4ec9b0', cursor: 'pointer', textAlign: 'center', display: 'block', fontSize: 15, fontWeight: '500' },
-  uploadHint: { color: '#555', fontSize: 12, marginTop: 8, textAlign: 'center' },
-  settleBtn: {
-  background: '#4ec9b0', color: '#000', border: 'none',
-  borderRadius: 8, padding: '10px 20px', cursor: 'pointer',
-  fontWeight: 'bold', marginTop: 8
-},
-settledBadge: {
-  background: '#1a3a2a', color: '#4ec9b0', padding: '8px 16px',
-  borderRadius: 8, fontWeight: 'bold', marginTop: 8,
-  display: 'inline-block'
-}
+  chip: { border: '1px solid #E2E8F0', borderRadius: 20, padding: '8px 16px', cursor: 'pointer', fontSize: 14, fontWeight: '700', transition: 'all 0.2s' },
+  empty: { color: 'var(--text-muted)', fontSize: 15, padding: 24, textAlign: 'center', fontWeight: '500' },
+  memberRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '16px 0', borderBottom: '1px solid #F1F5F9' },
+  avatar: { width: 44, height: 44, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: 18, flexShrink: 0 },
+  memberName: { color: 'var(--text-main)', fontSize: 16, margin: 0, fontWeight: '700' },
+  memberOwes: { color: 'var(--text-muted)', fontSize: 14, margin: '4px 0 0', fontWeight: '500' },
+  statusBadge: { padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  saveBtn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 20, padding: 20, fontSize: 16, fontWeight: '800', cursor: 'pointer', width: '100%', marginTop: 24, boxShadow: '0 10px 20px rgba(99, 102, 241, 0.2)' },
+  uploadBtn: { background: '#F8FAFC', border: '2px dashed #E2E8F0', borderRadius: 20, padding: 32, color: 'var(--primary)', cursor: 'pointer', textAlign: 'center', display: 'block', fontSize: 16, fontWeight: '700', transition: 'all 0.3s' },
+  uploadHint: { color: 'var(--text-muted)', fontSize: 13, marginTop: 12, textAlign: 'center', fontWeight: '500' },
+  settleBtn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 16, padding: '12px 24px', cursor: 'pointer', fontWeight: '800', marginTop: 16 },
+  settledBadge: { background: 'rgba(16, 185, 129, 0.1)', color: '#065F46', padding: '12px 24px', borderRadius: 16, fontWeight: '800', marginTop: 16, display: 'inline-block', border: '1px solid rgba(16, 185, 129, 0.2)' },
+  contactBtnSmall: { background: 'rgba(99, 102, 241, 0.05)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: '700' }
 };

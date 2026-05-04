@@ -10,7 +10,7 @@ import Payment from './pages/Payment';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ background: '#0a0a0a', minHeight: '100vh' }} />;
+  if (loading) return <div style={{ background: '#050505', minHeight: '100vh' }} />;
   return user ? children : <Navigate to="/login" />;
 }
 

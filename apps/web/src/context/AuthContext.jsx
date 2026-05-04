@@ -1,18 +1,21 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useContext, useEffect } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+      try { return JSON.parse(savedUser); } catch { return null; }
     }
+    return null;
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
     setLoading(false);
   }, []);
 
@@ -34,8 +37,14 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateUser = (newDetails) => {
+    const updatedUser = { ...user, ...newDetails };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );

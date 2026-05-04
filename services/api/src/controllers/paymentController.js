@@ -4,9 +4,22 @@ const QRCode = require('qrcode');
 // Generate UPI payment links for all members of a bill
 const generatePaymentLinks = async (req, res) => {
   const { billId } = req.params;
-  const payerId = req.user.userId;
+  const currentUserId = req.user.userId;
 
   try {
+    const billResult = await pool.query(
+      'SELECT created_by, title FROM bills WHERE id = $1',
+      [billId]
+    );
+    
+    if (!billResult.rows[0]) {
+       return res.status(404).json({ error: 'Bill not found' });
+    }
+    
+    const bill = billResult.rows[0];
+    const payerId = bill.created_by;
+    const billTitle = bill.title;
+
     // Get payer details
     const payerResult = await pool.query(
       'SELECT * FROM users WHERE id = $1',
@@ -15,9 +28,15 @@ const generatePaymentLinks = async (req, res) => {
     const payer = payerResult.rows[0];
 
     if (!payer.upi_id) {
-      return res.status(400).json({ 
-        error: 'Please add your UPI ID first. Others will pay you on this ID.' 
-      });
+      if (payerId === currentUserId) {
+        return res.status(400).json({ 
+          error: 'Please add your UPI ID first. Others will pay you on this ID.' 
+        });
+      } else {
+        return res.status(400).json({ 
+          error: `The person who paid (${payer.name}) hasn't added their UPI ID yet.` 
+        });
+      }
     }
 
     // Get all members and their amounts
@@ -30,11 +49,11 @@ const generatePaymentLinks = async (req, res) => {
       [billId, payerId]
     );
 
-    const bill = await pool.query(
-      'SELECT title FROM bills WHERE id = $1',
+    // Clear old pending payments to regenerate with fresh amounts
+    await pool.query(
+      `DELETE FROM payments WHERE bill_id = $1 AND status = 'pending'`,
       [billId]
     );
-    const billTitle = bill.rows[0].title;
 
     // Generate UPI link for each member
     const paymentLinks = [];
@@ -75,6 +94,7 @@ const generatePaymentLinks = async (req, res) => {
     res.json({
       message: 'Payment links generated',
       payer: {
+        id: payer.id,
         name: payer.name,
         upi_id: payer.upi_id
       },

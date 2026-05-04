@@ -10,108 +10,82 @@ export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
+  const [upiId, setUpiId] = useState('');
   const [step, setStep] = useState('phone');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
   const sendOTP = async () => {
-    if (phone.length !== 10) {
-      Alert.alert('Error', 'Enter a valid 10-digit phone number');
-      return;
-    }
+    if (phone.length !== 10) return Alert.alert('Error', 'Enter a valid 10-digit number');
     setLoading(true);
     try {
       await api.post('/api/auth/send-otp', { phone });
       setStep('otp');
-      Alert.alert('OTP Sent', 'Use 123456 for testing');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
+    } catch { Alert.alert('Error', 'Failed to send OTP'); }
+    finally { setLoading(false); }
   };
 
   const verifyOTP = async () => {
-    if (otp.length !== 6) {
-      Alert.alert('Error', 'Enter 6-digit OTP');
-      return;
-    }
+    if (otp.length !== 6) return Alert.alert('Error', 'Enter 6-digit OTP');
     setLoading(true);
     const result = await login(phone, otp, name);
-    if (!result.success) {
-      Alert.alert('Error', result.error);
-    }
+    if (result.success) setStep('upi');
+    else Alert.alert('Error', result.error);
     setLoading(false);
+  };
+
+  const saveUpiId = async () => {
+    setLoading(true);
+    try {
+      if (upiId.trim()) await api.post('/api/payments/upi-id', { upiId });
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <View style={styles.header}>
         <Text style={styles.logo}>Split.ai</Text>
-        <Text style={styles.tagline}>Split bills. Not friendships.</Text>
+        <Text style={styles.tagline}>Split bills, not friendships.</Text>
       </View>
 
       <View style={styles.form}>
-        {step === 'phone' ? (
+        {step === 'phone' && (
           <>
             <Text style={styles.label}>Your Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your name"
-              placeholderTextColor="#666"
-              value={name}
-              onChangeText={setName}
-            />
+            <TextInput style={styles.input} placeholder="Enter your name" value={name} onChangeText={setName} />
             <Text style={styles.label}>Phone Number</Text>
             <View style={styles.phoneRow}>
               <Text style={styles.countryCode}>+91</Text>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="10-digit mobile number"
-                placeholderTextColor="#666"
-                keyboardType="numeric"
-                maxLength={10}
-                value={phone}
-                onChangeText={setPhone}
-              />
+              <TextInput style={[styles.input, { flex: 1 }]} placeholder="10-digit number" keyboardType="numeric" maxLength={10} value={phone} onChangeText={setPhone} />
             </View>
-            <TouchableOpacity
-              style={styles.btn}
-              onPress={sendOTP}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>Send OTP →</Text>
-              }
+            <TouchableOpacity style={styles.btn} onPress={sendOTP} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Send OTP</Text>}
             </TouchableOpacity>
           </>
-        ) : (
+        )}
+
+        {step === 'otp' && (
           <>
-            <Text style={styles.label}>Enter OTP sent to +91 {phone}</Text>
-            <TextInput
-              style={[styles.input, styles.otpInput]}
-              placeholder="123456"
-              placeholderTextColor="#666"
-              keyboardType="numeric"
-              maxLength={6}
-              value={otp}
-              onChangeText={setOtp}
-            />
-            <Text style={styles.hint}>Use 123456 for testing</Text>
-            <TouchableOpacity
-              style={styles.btn}
-              onPress={verifyOTP}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>Verify & Login →</Text>
-              }
+            <Text style={styles.label}>OTP sent to +91 {phone}</Text>
+            <TextInput style={[styles.input, styles.otpInput]} placeholder="123456" keyboardType="numeric" maxLength={6} value={otp} onChangeText={setOtp} />
+            <TouchableOpacity style={styles.btn} onPress={verifyOTP} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify and Login</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setStep('phone')}>
-              <Text style={styles.back}>← Change number</Text>
+            <TouchableOpacity onPress={() => setStep('phone')}><Text style={styles.back}>Change number</Text></TouchableOpacity>
+          </>
+        )}
+
+        {step === 'upi' && (
+          <>
+            <Text style={styles.upiTitle}>One last step!</Text>
+            <Text style={styles.upiSub}>Add your UPI ID so friends can pay you back</Text>
+            <Text style={styles.label}>Your UPI ID</Text>
+            <TextInput style={styles.input} placeholder="e.g. name@okaxis" value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
+            <TouchableOpacity style={styles.btn} onPress={saveUpiId} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save and Continue</Text>}
             </TouchableOpacity>
+            <TouchableOpacity onPress={saveUpiId}><Text style={styles.back}>Skip for now</Text></TouchableOpacity>
           </>
         )}
       </View>
@@ -120,87 +94,19 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-    justifyContent: 'center',
-    padding: 24
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48
-  },
-  logo: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#4ec9b0',
-    letterSpacing: 2
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8
-  },
-  form: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 24
-  },
-  label: {
-    color: '#aaa',
-    fontSize: 13,
-    marginBottom: 8,
-    marginTop: 16
-  },
-  input: {
-    backgroundColor: '#2a2a2a',
-    color: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333'
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
-  },
-  countryCode: {
-    color: '#fff',
-    fontSize: 16,
-    backgroundColor: '#2a2a2a',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#333'
-  },
-  otpInput: {
-    fontSize: 24,
-    textAlign: 'center',
-    letterSpacing: 8
-  },
-  btn: {
-    backgroundColor: '#4ec9b0',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24
-  },
-  btnText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold'
-  },
-  hint: {
-    color: '#666',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8
-  },
-  back: {
-    color: '#4ec9b0',
-    textAlign: 'center',
-    marginTop: 16
-  }
+  container: { flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', padding: 20 },
+  header: { alignItems: 'center', marginBottom: 60 },
+  logo: { fontSize: 48, fontWeight: '800', color: '#6366F1', letterSpacing: -1.5 },
+  tagline: { fontSize: 16, color: '#64748B', marginTop: 8, fontWeight: '500' },
+  form: { backgroundColor: '#FFFFFF', borderRadius: 32, padding: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
+  label: { color: '#64748B', fontSize: 13, marginBottom: 8, marginTop: 20, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  input: { backgroundColor: '#F8FAFC', color: '#0F172A', borderRadius: 16, padding: 18, fontSize: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  countryCode: { color: '#0F172A', fontSize: 16, fontWeight: '700', backgroundColor: '#F8FAFC', padding: 18, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  otpInput: { fontSize: 28, textAlign: 'center', letterSpacing: 10, fontWeight: '800' },
+  btn: { backgroundColor: '#6366F1', borderRadius: 16, padding: 20, alignItems: 'center', marginTop: 32, shadowColor: '#6366F1', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8 },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  back: { color: '#6366F1', textAlign: 'center', marginTop: 24, fontWeight: '700', fontSize: 15 },
+  upiTitle: { color: '#0F172A', fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 8, letterSpacing: -0.5 },
+  upiSub: { color: '#64748B', fontSize: 15, textAlign: 'center', marginBottom: 16, fontWeight: '500' }
 });

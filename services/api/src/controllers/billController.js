@@ -176,13 +176,29 @@ const getUserBills = async (req, res) => {
   const userId = req.user.userId;
   try {
     const result = await pool.query(
-      `SELECT b.* FROM bills b
+      `SELECT b.*, bm.amount_owed, bm.amount_paid, bm.status as user_status 
+       FROM bills b
        JOIN bill_members bm ON b.id = bm.bill_id
        WHERE bm.user_id = $1
        ORDER BY b.created_at DESC`,
       [userId]
     );
-    res.json({ bills: result.rows });
+
+    let totalPending = 0;
+    result.rows.forEach(row => {
+      if (row.user_status !== 'paid' && row.amount_owed) {
+        const owed = parseFloat(row.amount_owed) || 0;
+        const paid = parseFloat(row.amount_paid) || 0;
+        totalPending += (owed - paid);
+      }
+    });
+
+    res.json({ 
+      bills: result.rows,
+      dashboardStats: {
+        totalPending: totalPending.toFixed(2)
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -211,4 +227,61 @@ const deleteItem = async (req, res) => {
   }
 };
 
-module.exports = { createBill, addItem, getBill, addMember, getUserBills, deleteItem };
+const deleteBill = async (req, res) => {
+  const { billId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const billResult = await pool.query('SELECT created_by FROM bills WHERE id = $1', [billId]);
+    if (!billResult.rows[0]) return res.status(404).json({ error: 'Bill not found' });
+    if (billResult.rows[0].created_by !== userId) {
+      return res.status(403).json({ error: 'Only the creator can delete the bill' });
+    }
+
+    // Delete related records manually to avoid FK constraint errors if cascade isn't set
+    await pool.query('DELETE FROM item_splits WHERE item_id IN (SELECT id FROM items WHERE bill_id = $1)', [billId]);
+    await pool.query('DELETE FROM items WHERE bill_id = $1', [billId]);
+    await pool.query('DELETE FROM payments WHERE bill_id = $1', [billId]);
+    await pool.query('DELETE FROM sessions WHERE bill_id = $1', [billId]);
+    await pool.query('DELETE FROM bill_members WHERE bill_id = $1', [billId]);
+    
+    // Delete the bill itself
+    await pool.query('DELETE FROM bills WHERE id = $1', [billId]);
+
+    res.json({ message: 'Bill deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const joinBill = async (req, res) => {
+  const { roomCode } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    const sessionResult = await pool.query(
+      'SELECT bill_id FROM sessions WHERE room_code = $1',
+      [roomCode]
+    );
+
+    if (!sessionResult.rows[0]) {
+      return res.status(404).json({ error: 'Invalid or expired room code' });
+    }
+
+    const billId = sessionResult.rows[0].bill_id;
+
+    await pool.query(
+      `INSERT INTO bill_members (bill_id, user_id) 
+       VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [billId, userId]
+    );
+
+    res.json({ message: 'Joined bill successfully', billId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { createBill, addItem, getBill, addMember, getUserBills, deleteItem, deleteBill, joinBill };
