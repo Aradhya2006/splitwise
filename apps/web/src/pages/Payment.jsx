@@ -44,7 +44,9 @@ export default function Payment() {
     </div>
   );
 
-  const displayPayments = user?.id === payer?.id ? payments : payments.filter(p => p.userId === user?.id);
+  const displayPayments = user?.id === payer?.id
+    ? payments
+    : payments.filter(p => p.userId === user?.id);
 
   return (
     <>
@@ -55,13 +57,16 @@ export default function Payment() {
 
         <h1 style={styles.title}>Payment</h1>
         <p style={styles.sub}>
-          {user?.id === payer?.id ? 'Everyone pays you' : 'You pay'} <strong style={{ color: 'var(--primary)' }}>{payer?.name}</strong> on UPI ID:{' '}
+          {user?.id === payer?.id ? 'Everyone pays you' : 'You pay'}{' '}
+          <strong style={{ color: 'var(--primary)' }}>{payer?.name}</strong> on UPI ID:{' '}
           <strong style={{ color: 'var(--primary)' }}>{payer?.upi_id}</strong>
         </p>
 
         {displayPayments.length === 0 ? (
-            <p style={styles.emptyText}>All settled</p>
+          <div style={styles.emptyState}>
+            <p style={styles.emptyText}>All settled! 🎉</p>
             <p style={styles.emptySub}>Everyone has paid their share.</p>
+          </div>
         ) : (
           displayPayments.map((payment, i) => (
             <div key={payment.userId} className="glass-panel animate-slide-up" style={{ ...styles.paymentCard, animationDelay: `${0.1 * i}s` }}>
@@ -74,7 +79,6 @@ export default function Payment() {
                 <div style={styles.amountBadge}>₹{payment.amount}</div>
               </div>
 
-              {/* QR Code */}
               {payment.qrCode && (
                 <div style={styles.qrContainer}>
                   <img src={payment.qrCode} alt="QR Code" style={styles.qrCode} />
@@ -82,12 +86,8 @@ export default function Payment() {
                 </div>
               )}
 
-              {/* UPI Links */}
               <div style={styles.linkRow}>
-                <a
-                  href={payment.upiLink}
-                  style={styles.upiBtn}
-                >
+                <a href={payment.upiLink} style={styles.upiBtn}>
                   Pay via UPI App
                 </a>
                 {user?.id === payer?.id && (
@@ -101,7 +101,7 @@ export default function Payment() {
                     onClick={() => confirmPayment(payment.userId)}
                     disabled={payment.status === 'paid' || confirming === payment.userId}
                   >
-                    {payment.status === 'paid' ? 'Paid' : confirming === payment.userId ? 'Confirming...' : 'Mark as Paid'}
+                    {payment.status === 'paid' ? 'Paid ✓' : confirming === payment.userId ? 'Confirming...' : 'Mark as Paid'}
                   </button>
                 )}
               </div>
@@ -109,6 +109,7 @@ export default function Payment() {
           ))
         )}
 
+        <button style={styles.doneBtn} onClick={() => navigate('/home')}>
           Return to Dashboard
         </button>
       </div>

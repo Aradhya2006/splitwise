@@ -137,19 +137,21 @@ const addMember = async (req, res) => {
   const { phone } = req.body;
 
   try {
-    // Find user by phone
     const userResult = await pool.query(
       'SELECT * FROM users WHERE phone = $1',
       [phone]
     );
 
-    if (!userResult.rows[0]) {
-      return res.status(404).json({ 
-        error: 'User not found. They need to sign up first.' 
-      });
-    }
+    let user = userResult.rows[0];
 
-    const user = userResult.rows[0];
+    // If user not found, create a placeholder user
+    if (!user) {
+      const newUserResult = await pool.query(
+        'INSERT INTO users (name, phone) VALUES ($1, $2) RETURNING *',
+        [`User ${phone.slice(-4)}`, phone]
+      );
+      user = newUserResult.rows[0];
+    }
 
     // Add to bill members
     await pool.query(

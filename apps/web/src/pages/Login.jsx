@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -7,34 +7,65 @@ export default function Login() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
+  const [upiId, setUpiId] = useState('');
   const [step, setStep] = useState('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const sendOTP = async () => {
-    if (phone.length !== 10) { setError('Enter valid 10-digit number'); return; }
+ useEffect(() => {
+  // Authentication now handled via backend OTP
+}, []);
+
+const sendOTP = async () => {
+  if (phone.length !== 10) { setError('Enter valid 10-digit number'); return; }
+  if (!name.trim()) { setError('Enter your name'); return; }
+  setLoading(true);
+  setError('');
+  try {
+    const res = await api.post('/api/auth/send-otp', { phone });
+    // In dev mode, we can auto-fill or alert the OTP if Twilio is not set up
+    if (res.data.debug_otp) {
+       console.log('DEBUG OTP:', res.data.debug_otp);
+       // alert(`DEBUG: Your OTP is ${res.data.debug_otp}`); // Optional
+    }
+    setStep('otp');
+  } catch (err) {
+    console.error('Full error:', err);
+    setError(err.response?.data?.error || 'Failed to send OTP');
+  }
+  setLoading(false);
+};
+
+  const verifyOTP = async () => {
+    if (otp.length !== 6) { setError('Enter 6-digit OTP'); return; }
     setLoading(true);
     setError('');
     try {
-      await api.post('/api/auth/send-otp', { phone });
-      setStep('otp');
-    } catch {
-      setError('Failed to send OTP');
+      const result = await login(phone, otp, name);
+      if (result.success) {
+        setStep('upi');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Invalid OTP. Try again.');
     }
     setLoading(false);
   };
 
-  const verifyOTP = async () => {
+  const saveUpiId = async () => {
     setLoading(true);
-    setError('');
-    const result = await login(phone, otp, name);
-    if (result.success) {
-      navigate('/home');
-    } else {
-      setError(result.error);
+    try {
+      if (upiId.trim()) {
+        await api.post('/api/payments/upi-id', { upiId });
+      }
+    } catch (err) {
+      console.error(err);
     }
+    navigate('/home');
     setLoading(false);
   };
 
@@ -49,7 +80,7 @@ export default function Login() {
 
           {error && <div style={styles.error}>{error}</div>}
 
-          {step === 'phone' ? (
+          {step === 'phone' && (
             <div className="animate-slide-up animate-delay-1" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <input
                 style={styles.input}
@@ -68,20 +99,21 @@ export default function Login() {
                 />
               </div>
               <button style={styles.btn} onClick={sendOTP} disabled={loading}>
-                {loading ? 'Sending...' : 'Send OTP'}
+                {loading ? 'Sending OTP...' : 'Send OTP'}
               </button>
             </div>
-          ) : (
+          )}
+
+          {step === 'otp' && (
             <div className="animate-slide-up animate-delay-1" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <p style={styles.hint}>Enter OTP for +91 {phone}</p>
+              <p style={styles.hint}>OTP sent to +91 {phone}</p>
               <input
                 style={{...styles.input, textAlign: 'center', fontSize: 24, letterSpacing: 8}}
-                placeholder="123456"
+                placeholder="------"
                 value={otp}
                 onChange={e => setOtp(e.target.value)}
                 maxLength={6}
               />
-              <p style={styles.hint}>Use 123456 for testing</p>
               <button style={styles.btn} onClick={verifyOTP} disabled={loading}>
                 {loading ? 'Verifying...' : 'Verify and Login'}
               </button>
@@ -90,6 +122,30 @@ export default function Login() {
               </button>
             </div>
           )}
+
+          {step === 'upi' && (
+            <div className="animate-slide-up animate-delay-1" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{...styles.hint, fontSize: 18, color: 'var(--text-main)', fontWeight: '700'}}>
+                One last step! 🎉
+              </p>
+              <p style={styles.hint}>Add your UPI ID so friends can pay you back</p>
+              <input
+                style={styles.input}
+                placeholder="e.g. name@okaxis"
+                value={upiId}
+                onChange={e => setUpiId(e.target.value)}
+                autoCapitalize="none"
+              />
+              <p style={styles.hint}>Example: 9999999999@ybl or name@okaxis</p>
+              <button style={styles.btn} onClick={saveUpiId} disabled={loading}>
+                {loading ? 'Saving...' : 'Save & Continue →'}
+              </button>
+              <button style={styles.backBtn} onClick={() => navigate('/home')}>
+                Skip for now
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
     </>

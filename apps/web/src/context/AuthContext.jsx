@@ -19,6 +19,7 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
+  // Backend OTP login
   const login = async (phone, otp, name) => {
     try {
       const res = await api.post('/api/auth/verify-otp', { phone, otp, name });
