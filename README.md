@@ -188,5 +188,3 @@ npm install
 npx expo start
 ```
 
-## Contributing
-Found a bug? Want to add a feature? Open an issue or submit a pull request!
