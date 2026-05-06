@@ -5,9 +5,6 @@ import Home from './pages/Home';
 import BillDetail from './pages/BillDetail';
 import Payment from './pages/Payment';
 
-// inside Routes add:
-
-
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ background: '#050505', minHeight: '100vh' }} />;
@@ -15,12 +12,11 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
   return (
     <Routes>
       <Route path="/payment/:billId" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
       <Route path="/bill/:billId" element={<ProtectedRoute><BillDetail /></ProtectedRoute>} />
-      <Route path="/login" element={user ? <Navigate to="/home" /> : <Login />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
@@ -36,6 +32,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
-
-

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 export default function BillDetail() {
   const { billId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [bill, setBill] = useState(null);
   const [items, setItems] = useState([]);
   const [members, setMembers] = useState([]);
@@ -313,8 +315,10 @@ const settleBill = async () => {
 
       {/* Items with Assignment */}
       <div className="glass-panel animate-slide-up animate-delay-3" style={{...styles.card, padding: 0}}>
-        <p style={styles.cardTitle}>Items — tap to assign ({items.length})</p>
-        <p style={styles.assignHint}>Tap an item then tap who ate it</p>
+        <div style={{ padding: '24px 24px 0' }}>
+          <p style={{...styles.cardTitle, marginBottom: 8}}>Items — tap to assign ({items.length})</p>
+          <p style={{...styles.assignHint, marginBottom: 0}}>Tap an item then tap who ate it</p>
+        </div>
         {items.length === 0 ? (
           <p style={styles.empty}>No items yet</p>
         ) : (
@@ -324,7 +328,7 @@ const settleBill = async () => {
                 style={{
                   ...styles.itemRow,
                   background: selectedItem === item.id ? 'rgba(99, 102, 241, 0.05)' : 'transparent',
-                  borderRadius: 12, cursor: 'pointer', padding: '12px'
+                  borderRadius: 0, cursor: 'pointer', padding: '16px 24px'
                 }}
                 onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
               >
@@ -451,10 +455,10 @@ const styles = {
   cardTitle: { color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   assignHint: { color: 'var(--text-muted)', fontSize: 12, marginBottom: 16, fontWeight: '500' },
   row: { display: 'flex', gap: 12, alignItems: 'center' },
-  input: { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14, color: 'var(--text-main)', fontSize: 15, outline: 'none', transition: 'border-color 0.2s' },
+  input: { background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14, color: 'var(--text-main)', fontSize: 15, outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', minWidth: 0 },
   addBtn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 20px', fontSize: 20, fontWeight: '800', cursor: 'pointer' },
   itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', transition: 'all 0.2s' },
-  subtotalRow: { display: 'flex', justifyContent: 'space-between', padding: '20px 8px 0', marginTop: 8 },
+  subtotalRow: { display: 'flex', justifyContent: 'space-between', padding: '20px 24px 24px', marginTop: 0 },
   itemName: { color: 'var(--text-main)', fontSize: 16, fontWeight: '700' },
   itemQty: { color: 'var(--text-muted)', fontSize: 14, fontWeight: '500' },
   itemPrice: { color: 'var(--text-main)', fontSize: 16, fontWeight: '800' },

@@ -24,16 +24,12 @@ function AppNavigator() {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!user ? (
-        <Stack.Screen name="Login" component={LoginScreen} />
-      ) : (
-        <>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="NewBill" component={NewBillScreen} />
-          <Stack.Screen name="BillDetail" component={BillDetailScreen} />
-          <Stack.Screen name="Payment" component={PaymentScreen} />
-        </>
-      )}
+      {/* We allow navigating to Login manually so the UPI step can complete */}
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="NewBill" component={NewBillScreen} />
+      <Stack.Screen name="BillDetail" component={BillDetailScreen} />
+      <Stack.Screen name="Payment" component={PaymentScreen} />
     </Stack.Navigator>
   );
 }

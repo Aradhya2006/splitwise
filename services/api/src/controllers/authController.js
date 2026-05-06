@@ -35,19 +35,24 @@ const sendOTP = async (req, res) => {
     }
 
     if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
-      await twilioClient.messages.create({
-        body: `Your Split.ai verification code is: ${otp}`,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: phone.startsWith('+') ? phone : `+91${phone}`
-      });
-      console.log(`Real OTP ${otp} sent to ${phone}`);
+      try {
+        await twilioClient.messages.create({
+          body: `Your Split.ai verification code is: ${otp}`,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: phone.startsWith('+') ? phone : `+91${phone}`
+        });
+        console.log(`Real OTP ${otp} sent to ${phone}`);
+      } catch (twilioErr) {
+        console.error('Twilio failed, falling back to debug mode:', twilioErr.message);
+        // We don't throw here, so it falls back to showing the OTP in the response
+      }
     } else {
       console.log(`[TEST MODE] Real OTP ${otp} generated for ${phone} (Twilio not configured)`);
     }
 
     res.json({ 
       message: 'OTP sent successfully',
-      debug_otp: !twilioClient ? otp : undefined
+      debug_otp: otp // Always return for development
     });
 
   } catch (err) {

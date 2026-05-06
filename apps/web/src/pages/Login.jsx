@@ -11,32 +11,34 @@ export default function Login() {
   const [step, setStep] = useState('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
 
- useEffect(() => {
-  // Authentication now handled via backend OTP
-}, []);
-
-const sendOTP = async () => {
-  if (phone.length !== 10) { setError('Enter valid 10-digit number'); return; }
-  if (!name.trim()) { setError('Enter your name'); return; }
-  setLoading(true);
-  setError('');
-  try {
-    const res = await api.post('/api/auth/send-otp', { phone });
-    // In dev mode, we can auto-fill or alert the OTP if Twilio is not set up
-    if (res.data.debug_otp) {
-       console.log('DEBUG OTP:', res.data.debug_otp);
-       // alert(`DEBUG: Your OTP is ${res.data.debug_otp}`); // Optional
+  useEffect(() => {
+    // If the user is already logged in and just landed on the login page
+    // (not in the middle of onboarding), redirect them to home.
+    if (user && step === 'phone') {
+      navigate('/home');
     }
-    setStep('otp');
-  } catch (err) {
-    console.error('Full error:', err);
-    setError(err.response?.data?.error || 'Failed to send OTP');
-  }
-  setLoading(false);
-};
+  }, [user, step, navigate]);
+
+  const sendOTP = async () => {
+    if (phone.length !== 10) { setError('Enter valid 10-digit number'); return; }
+    if (!name.trim()) { setError('Enter your name'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/api/auth/send-otp', { phone });
+      if (res.data.debug_otp) {
+         console.log('DEBUG OTP:', res.data.debug_otp);
+      }
+      setStep('otp');
+    } catch (err) {
+      console.error('Full error:', err);
+      setError(err.response?.data?.error || 'Failed to send OTP');
+    }
+    setLoading(false);
+  };
 
   const verifyOTP = async () => {
     if (otp.length !== 6) { setError('Enter 6-digit OTP'); return; }

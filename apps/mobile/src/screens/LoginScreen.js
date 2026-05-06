@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView
@@ -13,7 +13,14 @@ export default function LoginScreen({ navigation }) {
   const [upiId, setUpiId] = useState('');
   const [step, setStep] = useState('phone');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+
+  useEffect(() => {
+    // Redirect to Home if already logged in and not in the middle of onboarding
+    if (user && step === 'phone') {
+      navigation.replace('Home');
+    }
+  }, [user, step, navigation]);
 
   const sendOTP = async () => {
     if (phone.length !== 10) return Alert.alert('Error', 'Enter a valid 10-digit number');
@@ -39,7 +46,10 @@ export default function LoginScreen({ navigation }) {
     try {
       if (upiId.trim()) await api.post('/api/payments/upi-id', { upiId });
     } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    finally { 
+      setLoading(false); 
+      navigation.replace('Home');
+    }
   };
 
   return (
