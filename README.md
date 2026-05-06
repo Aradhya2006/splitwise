@@ -2,7 +2,7 @@
 
 Split bills.
 
-Split.ai is a modern, AI-powered bill splitting application built for both Web and Mobile. It completely removes the friction from shared expenses—whether it's a dinner, a group trip, or household utilities—by letting you simply take a photo of your receipt. The AI extracts the items, you assign who ate or used what, and the app calculates tax, tip, and everyone's final share down to the exact rupee.
+Split.ai is a modern, AI-powered bill splitting application built for both Web and Mobile. It completely removes the friction from shared expenses whether it's a dinner, a group trip, or household utilities—by letting you simply take a photo of your receipt. The AI extracts the items, you assign who ate or used what, and the app calculates tax, tip, and everyone's final share down to the exact rupee.
 
 ## Why Built This
 
